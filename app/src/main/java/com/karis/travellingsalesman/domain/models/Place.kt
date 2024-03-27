@@ -1,4 +1,4 @@
-package com.karis.travellingsalesman.models
+package com.karis.travellingsalesman.domain.models
 
 data class Place(
     val id: String = "",

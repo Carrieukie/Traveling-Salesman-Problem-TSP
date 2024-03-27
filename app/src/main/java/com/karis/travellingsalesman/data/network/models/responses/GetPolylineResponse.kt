@@ -5,16 +5,9 @@ import com.google.gson.annotations.SerializedName
 data class GetPolylineResponse(
 
 	@field:SerializedName("routes")
-	val routes: List<RoutesItem>? = null
+	val routes: List<PolyLineItem> = emptyList()
 )
-
-data class Polyline(
-
-	@field:SerializedName("encodedPolyline")
-	val encodedPolyline: String? = null
-)
-
-data class RoutesItem(
+data class PolyLineItem(
 
 	@field:SerializedName("duration")
 	val duration: String? = null,
@@ -23,5 +16,11 @@ data class RoutesItem(
 	val distanceMeters: Int? = null,
 
 	@field:SerializedName("polyline")
-	val polyline: Polyline? = null
+	val polyline: EncodedPolyLine? = null
+)
+
+data class EncodedPolyLine(
+
+	@field:SerializedName("encodedPolyline")
+	val encodedPolyline: String? = null
 )

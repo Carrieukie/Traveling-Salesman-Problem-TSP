@@ -1,6 +1,6 @@
-package com.karis.travellingsalesman.domain
+package com.karis.travellingsalesman.domain.repository
 
-import com.karis.travellingsalesman.models.Place
+import com.karis.travellingsalesman.domain.models.Place
 import com.karis.travellingsalesman.utils.NetworkResult
 import kotlinx.coroutines.flow.Flow
 

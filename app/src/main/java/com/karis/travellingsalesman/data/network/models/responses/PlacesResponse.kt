@@ -1,7 +1,7 @@
 package com.karis.travellingsalesman.data.network.models.responses
 
 import com.google.gson.annotations.SerializedName
-import com.karis.travellingsalesman.models.Place
+import com.karis.travellingsalesman.domain.models.Place
 import kotlin.random.Random
 
 data class PlacesResponse(

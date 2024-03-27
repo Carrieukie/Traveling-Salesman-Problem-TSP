@@ -1,8 +1,8 @@
 package com.karis.travellingsalesman.data.repository
 
 import com.karis.travellingsalesman.data.network.api.PlacesApiService
-import com.karis.travellingsalesman.domain.PlacesRepository
-import com.karis.travellingsalesman.models.Place
+import com.karis.travellingsalesman.domain.repository.PlacesRepository
+import com.karis.travellingsalesman.domain.models.Place
 import com.karis.travellingsalesman.utils.NetworkResult
 import com.karis.travellingsalesman.utils.safeApiCall
 import kotlinx.coroutines.flow.Flow

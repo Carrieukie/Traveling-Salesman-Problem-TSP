@@ -48,7 +48,8 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.karis.travellingsalesman.models.Place
+import com.karis.travellingsalesman.domain.models.Place
+import com.karis.travellingsalesman.domain.models.Point
 import com.karis.travellingsalesman.utils.convertSecondsToTime
 import com.karis.travellingsalesman.utils.observeAsEvents
 

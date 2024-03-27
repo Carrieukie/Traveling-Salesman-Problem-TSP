@@ -1,6 +1,6 @@
 package com.karis.travellingsalesman.ui.presentation.home
 
-import com.karis.travellingsalesman.models.Place
+import com.karis.travellingsalesman.domain.models.Place
 
 sealed interface HomeScreenUiEvents {
     data class ShowSnackBar(val message: String) : HomeScreenUiEvents

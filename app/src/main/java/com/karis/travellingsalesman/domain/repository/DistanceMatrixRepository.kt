@@ -1,4 +1,4 @@
-package com.karis.travellingsalesman.domain
+package com.karis.travellingsalesman.domain.repository
 
 import com.google.maps.model.DistanceMatrix
 import com.karis.travellingsalesman.utils.NetworkResult

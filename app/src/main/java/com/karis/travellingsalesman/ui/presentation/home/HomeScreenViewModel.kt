@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.maps.model.DistanceMatrix
 import com.karis.travellingsalesman.BuildConfig
-import com.karis.travellingsalesman.domain.DistanceMatrixRepository
-import com.karis.travellingsalesman.domain.PlacesRepository
-import com.karis.travellingsalesman.models.Place
+import com.karis.travellingsalesman.domain.repository.DistanceMatrixRepository
+import com.karis.travellingsalesman.domain.repository.PlacesRepository
+import com.karis.travellingsalesman.domain.repository.PolylinesRepository
+import com.karis.travellingsalesman.domain.models.Place
+import com.karis.travellingsalesman.domain.models.Point
+import com.karis.travellingsalesman.domain.models.toGetPolyLineRequest
 import com.karis.travellingsalesman.utils.AdjacencyMatrixCreationType
 import com.karis.travellingsalesman.utils.NetworkResult
-import com.karis.travellingsalesman.utils.TSPResult
 import com.karis.travellingsalesman.utils.getAdjacencyMatrix
 import com.karis.travellingsalesman.utils.heldKarpgetShortestTimePath
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,7 +28,7 @@ import javax.inject.Inject
 class HomeScreenViewModel @Inject constructor(
     private val computeRouteRepository: DistanceMatrixRepository,
     private val placesRepository: PlacesRepository,
-
+    private val polylinesRepository: PolylinesRepository
 ) : ViewModel() {
 
     private val _mainActivityState = MutableStateFlow(HomeScreenState())
@@ -217,6 +219,38 @@ class HomeScreenViewModel @Inject constructor(
         }
     }
 
+    fun getPolyline() {
+        val tspTour = _mainActivityState.value.tspResult?.path ?: emptyList()
+        val points = tspTour.mapNotNull {
+            _mainActivityState.value.points[it]
+        }
+
+        viewModelScope.launch {
+            polylinesRepository.getTourPolyline(points.toGetPolyLineRequest())
+                .collect { networkResult ->
+                    when (networkResult) {
+                        is NetworkResult.Error -> {
+                            val message = networkResult.errorMessage ?: "Error"
+                            sendSnackBarEvent(message)
+                        }
+
+                        is NetworkResult.Loading -> {
+                            _mainActivityState.update {
+                                it.copy(isGettingDistanceMatrix = true)
+                            }
+                        }
+
+                        is NetworkResult.Success -> {
+                            _mainActivityState.update {
+                                it.copy(
+                                    polyLines = networkResult.data ?: emptyList(),
+                                )
+                            }
+                        }
+                    }
+                }
+        }
+    }
 
     /**
      * Updates the suggestions for a specific point with the provided list of place suggestions.
@@ -338,20 +372,5 @@ class HomeScreenViewModel @Inject constructor(
 
 }
 
-data class HomeScreenState(
-    val distanceMatrix: DistanceMatrix? = null,
-    val isGettingDistanceMatrix: Boolean = false,
-    val tspResult: TSPResult? = null,
-    val points: Map<Int, Point> = mapOf(0 to Point(0, "Point 0"))
-)
 
-fun HomeScreenState.isButtonEnabled(): Boolean {
-    return points.size > 1 && points.values.all { it.selectedPlace != null }
-}
 
-data class Point(
-    val id: Int,
-    val name: String,
-    val placeSuggestions: List<Place> = emptyList(),
-    val selectedPlace: Place? = null
-)

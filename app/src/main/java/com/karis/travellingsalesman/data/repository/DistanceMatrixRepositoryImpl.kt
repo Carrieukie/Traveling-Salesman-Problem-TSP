@@ -3,7 +3,7 @@ package com.karis.travellingsalesman.data.repository
 import com.google.maps.DistanceMatrixApi
 import com.google.maps.GeoApiContext
 import com.google.maps.model.TravelMode
-import com.karis.travellingsalesman.domain.DistanceMatrixRepository
+import com.karis.travellingsalesman.domain.repository.DistanceMatrixRepository
 import com.karis.travellingsalesman.utils.NetworkResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

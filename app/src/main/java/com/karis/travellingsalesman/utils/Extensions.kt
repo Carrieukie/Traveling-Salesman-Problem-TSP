@@ -1,5 +1,9 @@
 package com.karis.travellingsalesman.utils
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+
 fun convertSecondsToTime(seconds: Long): String {
     var remainingSeconds = seconds
 
@@ -30,5 +34,18 @@ fun convertSecondsToTime(seconds: Long): String {
         if (hours > 0) append("$hours hr ")
         if (minutes > 0) append("$minutes min")
         append(")")
+    }
+}
+
+/**
+ * Utility function to execute asynchronous tasks for each item in a list.
+ * @param list The list of items to process asynchronously.
+ * @param block The suspend function to apply to each item.
+ * @return A list of deferred results representing the asynchronous computations.
+ */
+fun <T, V> CoroutineScope.asyncAll(list: List<T>, block: suspend (T) -> V): List<Deferred<V>> {
+    // Map each item to a deferred result representing the asynchronous computation.
+    return list.map { item ->
+        async { block.invoke(item) }
     }
 }

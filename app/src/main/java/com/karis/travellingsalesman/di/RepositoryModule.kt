@@ -2,8 +2,8 @@ package com.karis.travellingsalesman.di
 
 import com.karis.travellingsalesman.data.repository.DistanceMatrixRepositoryImpl
 import com.karis.travellingsalesman.data.repository.PlacesRepositoryImpl
-import com.karis.travellingsalesman.domain.DistanceMatrixRepository
-import com.karis.travellingsalesman.domain.PlacesRepository
+import com.karis.travellingsalesman.domain.repository.DistanceMatrixRepository
+import com.karis.travellingsalesman.domain.repository.PlacesRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
