@@ -25,7 +25,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeScreenViewModel @Inject constructor(
     private val computeRouteRepository: DistanceMatrixRepository,
-    private val placesRepository: PlacesRepository
+    private val placesRepository: PlacesRepository,
+
 ) : ViewModel() {
 
     private val _mainActivityState = MutableStateFlow(HomeScreenState())
