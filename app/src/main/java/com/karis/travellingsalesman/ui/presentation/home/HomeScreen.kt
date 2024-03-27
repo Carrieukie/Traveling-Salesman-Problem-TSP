@@ -40,6 +40,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.karis.travellingsalesman.domain.models.Place
 import com.karis.travellingsalesman.domain.models.Point
@@ -106,7 +108,14 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .fillMaxHeight(),
                 cameraPositionState = cameraPositionState
-            )
+            ){
+                homeScreenState.value.decodedPolyLines.let {
+                    Polyline(
+                        points = it,
+                        color = Color.Green
+                    )
+                }
+            }
         }
     }
 }

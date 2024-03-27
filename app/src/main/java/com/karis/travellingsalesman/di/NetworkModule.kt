@@ -1,6 +1,7 @@
 package com.karis.travellingsalesman.di
 
 import com.karis.travellingsalesman.data.network.api.PlacesApiService
+import com.karis.travellingsalesman.data.network.api.RoutesApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -72,6 +73,14 @@ object NetworkModule {
         @Named("maps") retrofit: Retrofit
     ): PlacesApiService {
         return retrofit.create(PlacesApiService::class.java)
+    }
+
+    @Singleton
+    @Provides
+    fun providesRoutesApiService(
+        @Named("routes") retrofit: Retrofit
+    ): RoutesApiService {
+        return retrofit.create(RoutesApiService::class.java)
     }
 
 }

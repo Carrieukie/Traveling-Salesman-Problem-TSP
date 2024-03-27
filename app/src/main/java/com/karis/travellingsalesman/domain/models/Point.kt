@@ -11,11 +11,10 @@ data class Point(
     val selectedPlace: Place? = null
 )
 
-fun List<Point>.toGetPolyLineRequest(): List<GetPolyLineRequest>{
-    return map {
+fun List<Point>.toGetPolyLineRequest(): List<GetPolyLineRequest> =
+    (0 until size - 1).map {
         GetPolyLineRequest(
-            destination = Destination(it.selectedPlace?.name.orEmpty()),
-            origin = Origin(it.selectedPlace?.name.orEmpty()),
+            origin = Origin(this[it].selectedPlace?.name.orEmpty()),
+            destination = Destination(this[it + 1].selectedPlace?.name.orEmpty()),
         )
     }
-}

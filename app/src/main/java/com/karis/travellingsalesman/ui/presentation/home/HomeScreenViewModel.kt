@@ -2,6 +2,7 @@ package com.karis.travellingsalesman.ui.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.maps.model.LatLng
 import com.google.maps.model.DistanceMatrix
 import com.karis.travellingsalesman.BuildConfig
 import com.karis.travellingsalesman.domain.repository.DistanceMatrixRepository
@@ -9,14 +10,20 @@ import com.karis.travellingsalesman.domain.repository.PlacesRepository
 import com.karis.travellingsalesman.domain.repository.PolylinesRepository
 import com.karis.travellingsalesman.domain.models.Place
 import com.karis.travellingsalesman.domain.models.Point
+import com.karis.travellingsalesman.domain.models.PolyLine
 import com.karis.travellingsalesman.domain.models.toGetPolyLineRequest
 import com.karis.travellingsalesman.utils.AdjacencyMatrixCreationType
 import com.karis.travellingsalesman.utils.NetworkResult
+import com.karis.travellingsalesman.utils.asyncAll
+import com.karis.travellingsalesman.utils.decodeEncodedPolyline
 import com.karis.travellingsalesman.utils.getAdjacencyMatrix
 import com.karis.travellingsalesman.utils.heldKarpgetShortestTimePath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -157,6 +164,7 @@ class HomeScreenViewModel @Inject constructor(
                     tspResult = tspResult
                 )
             }
+            getPolyline()
         }
     }
 
@@ -219,7 +227,7 @@ class HomeScreenViewModel @Inject constructor(
         }
     }
 
-    fun getPolyline() {
+    private fun getPolyline() {
         val tspTour = _mainActivityState.value.tspResult?.path ?: emptyList()
         val points = tspTour.mapNotNull {
             _mainActivityState.value.points[it]
@@ -243,7 +251,7 @@ class HomeScreenViewModel @Inject constructor(
                         is NetworkResult.Success -> {
                             _mainActivityState.update {
                                 it.copy(
-                                    polyLines = networkResult.data ?: emptyList(),
+                                    decodedPolyLines = networkResult.data ?: emptyList(),
                                 )
                             }
                         }
@@ -251,6 +259,8 @@ class HomeScreenViewModel @Inject constructor(
                 }
         }
     }
+
+
 
     /**
      * Updates the suggestions for a specific point with the provided list of place suggestions.
