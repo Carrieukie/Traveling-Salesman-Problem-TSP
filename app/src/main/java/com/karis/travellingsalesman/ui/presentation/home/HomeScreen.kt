@@ -50,7 +50,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.karis.travellingsalesman.domain.models.Place
 import com.karis.travellingsalesman.domain.models.Point
 import com.karis.travellingsalesman.utils.convertSecondsToTime
 import com.karis.travellingsalesman.utils.observeAsEvents
@@ -108,7 +107,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .fillMaxHeight(),
                 cameraPositionState = cameraPositionState
-            ){
+            ) {
                 homeScreenState.value.decodedPolyLines.let {
                     Polyline(
                         points = it,
@@ -135,8 +134,8 @@ fun BottomSheet(
             .wrapContentHeight(),
         state = pagerState,
         verticalAlignment = Alignment.Top,
-        ) { page ->
-        when(page){
+    ) { page ->
+        when (page) {
             0 -> RouteOptimization(homeScreenState, onEvent)
             1 -> RouteOptimizationResults(homeScreenState)
         }
@@ -238,18 +237,13 @@ fun DestinationPoint(
         ) {
             OutlinedTextField(
                 textStyle = MaterialTheme.typography.bodyMedium,
-                value = homeScreenState.value.points[point.id]?.selectedPlace?.name ?: "",
+                value = homeScreenState.value.points[point.id]?.name.orEmpty(),
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier
                     .weight(1f),
                 onValueChange = {
+                    onEvent(HomeScreenUiEvents.UpdatePointSearchText(point.id, it))
                     onEvent(HomeScreenUiEvents.GetPrediction(point.id, it))
-                    onEvent(
-                        HomeScreenUiEvents.SelectPlace(
-                            point.id,
-                            Place(id = point.id.toString(), name = it)
-                        )
-                    )
                 },
                 placeholder = {
                     Text(
@@ -270,12 +264,12 @@ fun DestinationPoint(
 
         }
 
-        if (point.placeSuggestions.isNotEmpty()) {
+        if (point.suggestionSuggestions.isNotEmpty()) {
             LazyColumn(
                 modifier = Modifier
                     .height(140.dp)
             ) {
-                items(point.placeSuggestions) { place ->
+                items(point.suggestionSuggestions) { place ->
                     Text(
                         text = "${place.name} ",
                         modifier = Modifier

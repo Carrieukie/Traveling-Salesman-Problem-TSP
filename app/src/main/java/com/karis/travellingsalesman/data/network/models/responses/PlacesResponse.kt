@@ -1,7 +1,7 @@
 package com.karis.travellingsalesman.data.network.models.responses
 
 import com.google.gson.annotations.SerializedName
-import com.karis.travellingsalesman.domain.models.Place
+import com.karis.travellingsalesman.domain.models.Suggestion
 import kotlin.random.Random
 
 data class PlacesResponse(
@@ -58,8 +58,11 @@ data class PredictionsItem(
     @field:SerializedName("place_id")
 	val placeId: String? = null
 ){
-	fun toPlace(): Place {
-		return Place(id = placeId ?: Random.nextInt().toString(), name = description ?: "", secondaryText = structuredFormatting?.secondaryText ?: structuredFormatting?.mainText ?: "")
+	fun toPlace(): Suggestion {
+		return Suggestion(
+			id = placeId ?: Random.nextInt().toString(),
+			name = description ?: "",
+			secondaryText = structuredFormatting?.secondaryText ?: structuredFormatting?.mainText ?: "")
 	}
 }
 

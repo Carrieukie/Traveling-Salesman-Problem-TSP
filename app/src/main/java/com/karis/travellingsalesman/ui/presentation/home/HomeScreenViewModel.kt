@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.model.DistanceMatrix
 import com.karis.travellingsalesman.BuildConfig
-import com.karis.travellingsalesman.domain.models.Place
+import com.karis.travellingsalesman.domain.models.Suggestion
 import com.karis.travellingsalesman.domain.models.Point
 import com.karis.travellingsalesman.domain.models.toGetPolyLineRequest
 import com.karis.travellingsalesman.domain.repository.DistanceMatrixRepository
@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
@@ -56,7 +57,7 @@ class HomeScreenViewModel @Inject constructor(
 
                 is HomeScreenUiEvents.SelectPlace -> selectPlace(
                     pointId = event.id,
-                    place = event.place,
+                    suggestion = event.suggestion,
                     shouldClearSuggestions = event.shouldClearSuggestions
                 )
 
@@ -75,13 +76,21 @@ class HomeScreenViewModel @Inject constructor(
                         .value
                         .points
                         .values
-                        .mapNotNull { it.selectedPlace?.name }
+                        .mapNotNull { it.selectedSuggestion?.name }
                 )
 
                 is HomeScreenUiEvents.FetchGeolocationData -> getFetchPlaceGeometry(
                     input = event.input,
                     pointId = event.id
                 )
+
+                is HomeScreenUiEvents.UpdatePointSearchText -> {
+                    updatePointSearchText(
+                        input = event.text,
+                        pointId = event.id
+                    )
+
+                }
             }
         }
     }
@@ -207,7 +216,7 @@ class HomeScreenViewModel @Inject constructor(
                         // Update point suggestions with the retrieved data
                         updatePointSuggestions(
                             pointId = pointId,
-                            placeSuggestions = networkResult.data ?: emptyList()
+                            suggestionSuggestions = networkResult.data ?: emptyList()
                         )
                         // Update UI to reflect the end of loading state
 
@@ -285,11 +294,11 @@ class HomeScreenViewModel @Inject constructor(
     /**
      * Updates the suggestions for a specific point with the provided list of place suggestions.
      * @param pointId The ID of the point for which suggestions are being updated.
-     * @param placeSuggestions The list of place suggestions to update for the point.
+     * @param suggestionSuggestions The list of place suggestions to update for the point.
      */
     private fun updatePointSuggestions(
         pointId: Int,
-        placeSuggestions: List<Place>
+        suggestionSuggestions: List<Suggestion>
     ) = intent {
         // Retrieve the point from the current state
         val point = _mainActivityState.value.points[pointId]
@@ -303,7 +312,7 @@ class HomeScreenViewModel @Inject constructor(
 
         // Create a new point with updated place suggestions
         val updatedPoint = point.copy(
-            placeSuggestions = placeSuggestions
+            suggestionSuggestions = suggestionSuggestions
         )
 
         // Update the main activity state with the new point
@@ -346,7 +355,7 @@ class HomeScreenViewModel @Inject constructor(
         val newPointId = points.keys.maxOrNull()?.plus(1) ?: 0
 
         // Create a new point with the determined ID and a default name
-        val newPoint = Point(newPointId, "Point $newPointId")
+        val newPoint = Point(newPointId, "")
 
         // Update the main activity state with the new point added
         reduce {
@@ -361,12 +370,12 @@ class HomeScreenViewModel @Inject constructor(
     /**
      * Selects a place for a specific point in the main activity state.
      * @param pointId The ID of the point for which the place is being selected.
-     * @param place The selected place.
+     * @param suggestion The selected place.
      * @param shouldClearSuggestions Flag indicating whether to clear the place suggestions for the point.
      */
     private fun selectPlace(
         pointId: Int,
-        place: Place,
+        suggestion: Suggestion,
         shouldClearSuggestions: Boolean
     ) = intent {
         // Retrieve the point from the main activity state
@@ -381,8 +390,8 @@ class HomeScreenViewModel @Inject constructor(
 
         // Create an updated point with the selected place and updated suggestions list
         val updatedPoint = point.copy(
-            selectedPlace = place,
-            placeSuggestions = if (shouldClearSuggestions) emptyList() else point.placeSuggestions
+            selectedSuggestion = suggestion,
+            suggestionSuggestions = if (shouldClearSuggestions) emptyList() else point.suggestionSuggestions
         )
 
         // Update the main activity state with the updated point
@@ -392,8 +401,32 @@ class HomeScreenViewModel @Inject constructor(
             )
         }
 
-        if (shouldClearSuggestions){
-            onEvent(HomeScreenUiEvents.FetchGeolocationData(pointId, place.name))
+        if (shouldClearSuggestions) {
+            onEvent(HomeScreenUiEvents.FetchGeolocationData(pointId, suggestion.name))
+        }
+    }
+
+    /**
+     * Updates the search text for a specific point.
+     * @param input The new search text.
+     * @param pointId The ID of the point to update.
+     */
+    private fun updatePointSearchText(input: String, pointId: Int)  {
+        val point = _mainActivityState.value.points[pointId]
+        if (point == null) {
+            // If the point is not found, show a snack bar notification.
+            sendSnackBarEvent("Point not found")
+            return
+        }
+        // Update the point with the new search text.
+        val updatedPoint = point.copy(
+            name = input
+        )
+        // Reduce the state by updating the points list with the modified point.
+        _mainActivityState.update {
+            it.copy(
+                points = it.points + (pointId to updatedPoint)
+            )
         }
     }
 
@@ -452,6 +485,4 @@ class HomeScreenViewModel @Inject constructor(
     }
 
 }
-
-
 
