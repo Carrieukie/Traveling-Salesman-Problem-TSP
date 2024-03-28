@@ -13,4 +13,6 @@ sealed interface HomeScreenUiEvents {
     data class RemovePoint(val id: Int) : HomeScreenUiEvents
     object AddPoint : HomeScreenUiEvents
     object OptimizeRoute : HomeScreenUiEvents
+
+    data class FetchGeolocationData(val id: Int, val input: String) : HomeScreenUiEvents
 }

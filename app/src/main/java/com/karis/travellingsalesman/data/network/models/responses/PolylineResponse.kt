@@ -2,7 +2,7 @@ package com.karis.travellingsalesman.data.network.models.responses
 
 import com.google.gson.annotations.SerializedName
 
-data class GetPolylineResponse(
+data class PolylineResponse(
 
 	@field:SerializedName("routes")
 	val routes: List<PolyLineItem> = emptyList()

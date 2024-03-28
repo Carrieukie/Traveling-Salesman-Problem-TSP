@@ -2,9 +2,8 @@ package com.karis.travellingsalesman.data.network.api
 
 import com.karis.travellingsalesman.BuildConfig
 import com.karis.travellingsalesman.data.network.models.requests.GetPolyLineRequest
-import com.karis.travellingsalesman.data.network.models.responses.GetPolylineResponse
+import com.karis.travellingsalesman.data.network.models.responses.PolylineResponse
 import retrofit2.http.Body
-import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 
@@ -15,6 +14,6 @@ interface RoutesApiService {
         @Header("X-Goog-FieldMask") fieldMask: String =
             "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline",
         @Body getPolyLineRequest: GetPolyLineRequest
-    ): GetPolylineResponse
+    ): PolylineResponse
 }
 

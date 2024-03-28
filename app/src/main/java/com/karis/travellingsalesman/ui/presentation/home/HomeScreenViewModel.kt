@@ -5,37 +5,32 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.model.DistanceMatrix
 import com.karis.travellingsalesman.BuildConfig
+import com.karis.travellingsalesman.domain.models.Place
+import com.karis.travellingsalesman.domain.models.Point
+import com.karis.travellingsalesman.domain.models.toGetPolyLineRequest
 import com.karis.travellingsalesman.domain.repository.DistanceMatrixRepository
 import com.karis.travellingsalesman.domain.repository.PlacesRepository
 import com.karis.travellingsalesman.domain.repository.PolylinesRepository
-import com.karis.travellingsalesman.domain.models.Place
-import com.karis.travellingsalesman.domain.models.Point
-import com.karis.travellingsalesman.domain.models.PolyLine
-import com.karis.travellingsalesman.domain.models.toGetPolyLineRequest
 import com.karis.travellingsalesman.utils.AdjacencyMatrixCreationType
 import com.karis.travellingsalesman.utils.NetworkResult
-import com.karis.travellingsalesman.utils.asyncAll
-import com.karis.travellingsalesman.utils.decodeEncodedPolyline
 import com.karis.travellingsalesman.utils.getAdjacencyMatrix
 import com.karis.travellingsalesman.utils.heldKarpgetShortestTimePath
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeScreenViewModel @Inject constructor(
     private val computeRouteRepository: DistanceMatrixRepository,
     private val placesRepository: PlacesRepository,
-    private val polylinesRepository: PolylinesRepository
+    private val polylineRepository: PolylinesRepository
 ) : ViewModel() {
 
     private val _mainActivityState = MutableStateFlow(HomeScreenState())
@@ -51,36 +46,43 @@ class HomeScreenViewModel @Inject constructor(
     fun onEvent(
         event: HomeScreenUiEvents
     ) {
-        // Process different types of events
-        when (event) {
-            is HomeScreenUiEvents.GetPrediction -> getPrediction(
-                pointId = event.id,
-                input = event.it
-            )
+        viewModelScope.launch {
+            // Process different types of events
+            when (event) {
+                is HomeScreenUiEvents.GetPrediction -> getPrediction(
+                    pointId = event.id,
+                    input = event.it
+                )
 
-            is HomeScreenUiEvents.SelectPlace -> selectPlace(
-                pointId = event.id,
-                place = event.place,
-                shouldClearSuggestions = event.shouldClearSuggestions
-            )
+                is HomeScreenUiEvents.SelectPlace -> selectPlace(
+                    pointId = event.id,
+                    place = event.place,
+                    shouldClearSuggestions = event.shouldClearSuggestions
+                )
 
-            is HomeScreenUiEvents.AddPoint -> addPoint()
+                is HomeScreenUiEvents.AddPoint -> addPoint()
 
-            is HomeScreenUiEvents.ShowSnackBar -> sendSnackBarEvent(
-                message = event.message
-            )
+                is HomeScreenUiEvents.ShowSnackBar -> sendSnackBarEvent(
+                    message = event.message
+                )
 
-            is HomeScreenUiEvents.RemovePoint -> removePoint(
-                pointId = event.id
-            )
+                is HomeScreenUiEvents.RemovePoint -> removePoint(
+                    pointId = event.id
+                )
 
-            is HomeScreenUiEvents.OptimizeRoute -> getDistanceMatrix(
-                locations = _mainActivityState
-                    .value
-                    .points
-                    .values
-                    .mapNotNull { it.selectedPlace?.name }
-            )
+                is HomeScreenUiEvents.OptimizeRoute -> getDistanceMatrix(
+                    locations = _mainActivityState
+                        .value
+                        .points
+                        .values
+                        .mapNotNull { it.selectedPlace?.name }
+                )
+
+                is HomeScreenUiEvents.FetchGeolocationData -> getFetchPlaceGeometry(
+                    input = event.input,
+                    pointId = event.id
+                )
+            }
         }
     }
 
@@ -89,42 +91,38 @@ class HomeScreenViewModel @Inject constructor(
      * Retrieves the distance matrix for the provided locations and updates the UI.
      * @param locations The list of locations for which the distance matrix is requested.
      */
-    private fun getDistanceMatrix(locations: List<String>) {
-        // Launch a coroutine in IO context
-        viewModelScope.launch(Dispatchers.IO) {
-            // Fetch the distance matrix from the computeRouteRepository
-            computeRouteRepository
-                .getDistanceMatrix(locations)
-                .collect { networkResult ->
-                    // Handle different network results
-                    when (networkResult) {
-                        is NetworkResult.Error -> {
-                            // If there's an error, display an appropriate snackbar message
-                            val message = networkResult.errorMessage ?: "Error"
-                            sendSnackBarEvent(message)
-                        }
+    private fun getDistanceMatrix(locations: List<String>) = intent {
 
-                        is NetworkResult.Loading -> {
-                            // Indicate loading state in the UI
-                            _mainActivityState.update {
-                                it.copy(isGettingDistanceMatrix = true)
-                            }
-                        }
+        // Fetch the distance matrix from the computeRouteRepository
+        computeRouteRepository
+            .getDistanceMatrix(locations)
+            .collect { networkResult ->
+                // Handle different network results
+                when (networkResult) {
+                    is NetworkResult.Error -> {
+                        // If there's an error, display an appropriate snackbar message
+                        val message = networkResult.errorMessage ?: "Error"
+                        sendSnackBarEvent(message)
+                    }
 
-                        is NetworkResult.Success -> {
-                            // Update the main activity state with the retrieved distance matrix
-                            _mainActivityState.update {
-                                it.copy(
-                                    distanceMatrix = networkResult.data,
-                                    isGettingDistanceMatrix = false
-                                )
-                            }
-                            // Calculate and update the shortest path based on the new distance matrix
-                            getShortestPath(networkResult.data)
+                    is NetworkResult.Loading -> {
+                        // Indicate loading state in the UI
+
+                    }
+
+                    is NetworkResult.Success -> {
+                        // Update the main activity state with the retrieved distance matrix
+                        reduce {
+                            copy(
+                                distanceMatrix = networkResult.data,
+                                isGettingDistanceMatrix = false
+                            )
                         }
+                        // Calculate and update the shortest path based on the new distance matrix
+                        getShortestPath(networkResult.data)
                     }
                 }
-        }
+            }
     }
 
 
@@ -133,40 +131,39 @@ class HomeScreenViewModel @Inject constructor(
      * If the distance matrix is null, displays a snackbar event indicating the unavailability.
      * @param distanceMatrix The distance matrix used to calculate the shortest path.
      */
-    private fun getShortestPath(distanceMatrix: DistanceMatrix?) {
+    private fun getShortestPath(distanceMatrix: DistanceMatrix?) = intent {
         // Check if the distance matrix is null
         if (distanceMatrix == null) {
             // Display a snackbar event indicating unavailability
             sendSnackBarEvent("No distance matrix available")
-            return
+            return@intent
         }
 
-        // Launch a coroutine in viewModelScope
-        viewModelScope.launch {
-            // Generate an adjacency matrix from the distance matrix
-            val timeAdjacencyMatrix = distanceMatrix.getAdjacencyMatrix(
-                adjacencyMatrixCreationType = AdjacencyMatrixCreationType.DURATION
-            )
+        // Generate an adjacency matrix from the distance matrix
+        val timeAdjacencyMatrix = distanceMatrix.getAdjacencyMatrix(
+            adjacencyMatrixCreationType = AdjacencyMatrixCreationType.DURATION
+        )
 
-            val distanceAdjacencyMatrix = distanceMatrix.getAdjacencyMatrix(
-                adjacencyMatrixCreationType = AdjacencyMatrixCreationType.DISTANCE
-            )
+        val distanceAdjacencyMatrix = distanceMatrix.getAdjacencyMatrix(
+            adjacencyMatrixCreationType = AdjacencyMatrixCreationType.DISTANCE
+        )
 
-            // Get the shortest path using the Held-Karp algorithm
-            val tspResult = heldKarpgetShortestTimePath(
-                timeAdjacencyMatrix = timeAdjacencyMatrix,
-                distanceAdjacencyMatrix = distanceAdjacencyMatrix
-            )
+        // Get the shortest path using the Held-Karp algorithm
+        val tspResult = heldKarpgetShortestTimePath(
+            timeAdjacencyMatrix = timeAdjacencyMatrix,
+            distanceAdjacencyMatrix = distanceAdjacencyMatrix
+        )
 
-            // Update the main activity state with the new shortest path
-            _mainActivityState.update {
-                it.copy(
-                    tspResult = tspResult
-                )
-            }
-            getPolyline()
+        // Update the main activity state with the new shortest path
+        reduce {
+            copy(
+                tspResult = tspResult
+            )
         }
+
+        getPolyline()
     }
+
 
     /**
      * Sends a snackbar event with the given message to be displayed on the UI.
@@ -188,79 +185,102 @@ class HomeScreenViewModel @Inject constructor(
     private fun getPrediction(
         pointId: Int,
         input: String
-    ) {
+    ) = intent {
         // Launch a coroutine in viewModelScope
-        viewModelScope.launch {
-            // Fetch places predictions from the repository
-            placesRepository.fetchPlaces(BuildConfig.MAPS_API_KEY, input)
-                .collect { networkResult ->
-                    // Handle different network results
-                    when (networkResult) {
-                        is NetworkResult.Error -> {
-                            // If there's an error, display an appropriate snackbar message
-                            val message = networkResult.errorMessage ?: "Error"
-                            sendSnackBarEvent(message)
-                        }
+        // Fetch places predictions from the repository
+        placesRepository.fetchPlaces(BuildConfig.MAPS_API_KEY, input)
+            .collect { networkResult ->
+                // Handle different network results
+                when (networkResult) {
+                    is NetworkResult.Error -> {
+                        // If there's an error, display an appropriate snackbar message
+                        val message = networkResult.errorMessage ?: "Error"
+                        sendSnackBarEvent(message)
+                    }
 
-                        is NetworkResult.Loading -> {
-                            // Indicate loading state in the UI
-                            _mainActivityState.update {
-                                it.copy(isGettingDistanceMatrix = true)
-                            }
-                        }
+                    is NetworkResult.Loading -> {
+                        // Indicate loading state in the UI
 
-                        is NetworkResult.Success -> {
-                            // Update point suggestions with the retrieved data
-                            updatePointSuggestions(
-                                pointId = pointId,
-                                placeSuggestions = networkResult.data ?: emptyList()
+                    }
+
+                    is NetworkResult.Success -> {
+                        // Update point suggestions with the retrieved data
+                        updatePointSuggestions(
+                            pointId = pointId,
+                            placeSuggestions = networkResult.data ?: emptyList()
+                        )
+                        // Update UI to reflect the end of loading state
+
+                        reduce {
+                            copy(
+                                isGettingDistanceMatrix = false
                             )
-                            // Update UI to reflect the end of loading state
-                            _mainActivityState.update {
-                                it.copy(
-                                    isGettingDistanceMatrix = false
-                                )
-                            }
                         }
                     }
                 }
-        }
+            }
+
     }
 
-    private fun getPolyline() {
+    private fun getFetchPlaceGeometry(input: String, pointId: Int) = intent {
+        placesRepository.fetchPlaceGeometry(input)
+            .collect { networkResult ->
+                when (networkResult) {
+                    is NetworkResult.Error -> {
+                        val message = networkResult.errorMessage ?: "Error"
+                        sendSnackBarEvent(message)
+                    }
+
+                    is NetworkResult.Loading -> {}
+
+                    is NetworkResult.Success -> {
+                        updatePointLatLng(
+                            pointId = pointId,
+                            latLng = networkResult.data ?: LatLng(0.0, 0.0)
+                        )
+                    }
+                }
+            }
+
+    }
+
+    private fun getPolyline() = intent {
+        // Retrieve the TSP tour from the current state, or an empty list if not available
         val tspTour = _mainActivityState.value.tspResult?.path ?: emptyList()
+
+        // Extract the points corresponding to the tour indices from the current state
         val points = tspTour.mapNotNull {
             _mainActivityState.value.points[it]
         }
 
-        viewModelScope.launch {
-            polylinesRepository.getTourPolyline(points.toGetPolyLineRequest())
-                .collect { networkResult ->
-                    when (networkResult) {
-                        is NetworkResult.Error -> {
-                            val message = networkResult.errorMessage ?: "Error"
-                            sendSnackBarEvent(message)
-                        }
+        // Initiate a coroutine for asynchronous operations
+        // Fetch the polyline data from the repository based on the points
+        polylineRepository.getTourPolyline(points.toGetPolyLineRequest())
+            .collect { networkResult ->
+                // Handle different states of the network request result
+                when (networkResult) {
+                    is NetworkResult.Error -> {
+                        // If there's an error, show a snack bar with the error message
+                        val message = networkResult.errorMessage ?: "Error"
+                        sendSnackBarEvent(message)
+                    }
 
-                        is NetworkResult.Loading -> {
-                            _mainActivityState.update {
-                                it.copy(isGettingDistanceMatrix = true)
-                            }
-                        }
+                    is NetworkResult.Loading -> {
+                        // If the request is still loading, update the state to indicate so
+                    }
 
-                        is NetworkResult.Success -> {
-                            _mainActivityState.update {
-                                it.copy(
-                                    decodedPolyLines = networkResult.data ?: emptyList(),
-                                )
-                            }
+                    is NetworkResult.Success -> {
+                        // If the request is successful, update the state with the received polyline data
+                        reduce {
+                            copy(
+                                decodedPolyLines = networkResult.data ?: emptyList()
+                            )
                         }
                     }
                 }
-        }
+            }
+
     }
-
-
 
     /**
      * Updates the suggestions for a specific point with the provided list of place suggestions.
@@ -270,7 +290,7 @@ class HomeScreenViewModel @Inject constructor(
     private fun updatePointSuggestions(
         pointId: Int,
         placeSuggestions: List<Place>
-    ) {
+    ) = intent {
         // Retrieve the point from the current state
         val point = _mainActivityState.value.points[pointId]
 
@@ -278,7 +298,7 @@ class HomeScreenViewModel @Inject constructor(
         if (point == null) {
             // If the point doesn't exist, display a snackbar message and return
             sendSnackBarEvent("Point not found")
-            return
+            return@intent
         }
 
         // Create a new point with updated place suggestions
@@ -287,9 +307,28 @@ class HomeScreenViewModel @Inject constructor(
         )
 
         // Update the main activity state with the new point
-        _mainActivityState.update {
-            it.copy(
-                points = it.points + (pointId to updatedPoint)
+        reduce {
+            copy(
+                points = points + (pointId to updatedPoint)
+            )
+        }
+    }
+
+    private fun updatePointLatLng(
+        pointId: Int,
+        latLng: LatLng
+    ) = intent {
+        val point = _mainActivityState.value.points[pointId]
+        if (point == null) {
+            sendSnackBarEvent("Point not found")
+            return@intent
+        }
+        val updatedPoint = point.copy(
+            latLng = latLng
+        )
+        reduce {
+            copy(
+                points = points + (pointId to updatedPoint)
             )
         }
     }
@@ -299,7 +338,7 @@ class HomeScreenViewModel @Inject constructor(
      * Adds a new point to the main activity state.
      * The new point is automatically assigned an ID greater than the existing maximum ID.
      */
-    private fun addPoint() {
+    private fun addPoint() = intent {
         // Retrieve the current points from the main activity state
         val points = _mainActivityState.value.points
 
@@ -310,11 +349,12 @@ class HomeScreenViewModel @Inject constructor(
         val newPoint = Point(newPointId, "Point $newPointId")
 
         // Update the main activity state with the new point added
-        _mainActivityState.update {
-            it.copy(
-                points = it.points + (newPointId to newPoint)
+        reduce {
+            copy(
+                points = points + (newPointId to newPoint)
             )
         }
+
     }
 
 
@@ -328,7 +368,7 @@ class HomeScreenViewModel @Inject constructor(
         pointId: Int,
         place: Place,
         shouldClearSuggestions: Boolean
-    ) {
+    ) = intent {
         // Retrieve the point from the main activity state
         val point = _mainActivityState.value.points[pointId]
 
@@ -336,7 +376,7 @@ class HomeScreenViewModel @Inject constructor(
         if (point == null) {
             // If the point doesn't exist, display a snackbar message and return
             sendSnackBarEvent("Point not found")
-            return
+            return@intent
         }
 
         // Create an updated point with the selected place and updated suggestions list
@@ -346,10 +386,14 @@ class HomeScreenViewModel @Inject constructor(
         )
 
         // Update the main activity state with the updated point
-        _mainActivityState.update {
-            it.copy(
-                points = it.points + (pointId to updatedPoint)
+        reduce {
+            copy(
+                points = points + (pointId to updatedPoint)
             )
+        }
+
+        if (shouldClearSuggestions){
+            onEvent(HomeScreenUiEvents.FetchGeolocationData(pointId, place.name))
         }
     }
 
@@ -357,12 +401,12 @@ class HomeScreenViewModel @Inject constructor(
      * Removes a point from the main activity state.
      * @param pointId The ID of the point to be removed.
      */
-    fun removePoint(pointId: Int) {
+    fun removePoint(pointId: Int) = intent {
         // Check if the point to be removed is the start point (ID 0)
         if (pointId == 0) {
             // If the point to be removed is the start point, display a snackbar message and return
             sendSnackBarEvent("Cannot remove start point")
-            return
+            return@intent
         }
 
         // Retrieve the current points from the main activity state
@@ -372,13 +416,40 @@ class HomeScreenViewModel @Inject constructor(
         val updatedPoints = points.filterKeys { it != pointId }
 
         // Update the main activity state with the updated points
-        _mainActivityState.update {
-            it.copy(
+        reduce {
+            copy(
                 points = updatedPoints
             )
         }
     }
 
+    /**
+     * Runs suspend function in a single couroutine context to prevent race conditions
+     * @param transform: Any suspend function that returns Unit
+     *
+     *
+     * @return Unit
+     */
+    private fun intent(transform: suspend () -> Unit) {
+        viewModelScope.launch(SINGLE_THREAD) {
+            transform()
+        }
+    }
+
+    /**
+     * This reducer reduces state in a single thread context to avoid race conditions
+     * on the State when more than one threads are changing it
+     */
+    private suspend fun reduce(reducer: HomeScreenState.() -> HomeScreenState) {
+        withContext(SINGLE_THREAD) {
+            _mainActivityState.value = _mainActivityState.value.reducer()
+        }
+    }
+
+    companion object {
+        @OptIn(DelicateCoroutinesApi::class)
+        private val SINGLE_THREAD = newSingleThreadContext("mvi")
+    }
 
 }
 
