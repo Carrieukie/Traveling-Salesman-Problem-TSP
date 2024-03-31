@@ -2,6 +2,8 @@ package com.karis.travellingsalesman.ui.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.maps.CameraUpdate
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.model.DistanceMatrix
 import com.karis.travellingsalesman.BuildConfig
@@ -13,7 +15,9 @@ import com.karis.travellingsalesman.domain.repository.PlacesRepository
 import com.karis.travellingsalesman.domain.repository.PolylinesRepository
 import com.karis.travellingsalesman.utils.AdjacencyMatrixCreationType
 import com.karis.travellingsalesman.utils.NetworkResult
+import com.karis.travellingsalesman.utils.calculateCameraViewPoints
 import com.karis.travellingsalesman.utils.getAdjacencyMatrix
+import com.karis.travellingsalesman.utils.getCenterLatLngs
 import com.karis.travellingsalesman.utils.heldKarpgetShortestTimePath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -47,54 +51,81 @@ class HomeScreenViewModel @Inject constructor(
     fun onEvent(
         event: HomeScreenUiEvents
     ) {
-        viewModelScope.launch {
-            // Process different types of events
-            when (event) {
-                is HomeScreenUiEvents.GetPrediction -> getPrediction(
-                    pointId = event.id,
-                    input = event.it
-                )
+        // Process different types of events
+        when (event) {
+            is HomeScreenUiEvents.GetPrediction -> getPrediction(
+                pointId = event.id,
+                input = event.it
+            )
 
-                is HomeScreenUiEvents.SelectPlace -> selectPlace(
-                    pointId = event.id,
-                    suggestion = event.suggestion,
-                    shouldClearSuggestions = event.shouldClearSuggestions
-                )
+            is HomeScreenUiEvents.SelectPlace -> selectSuggestion(
+                pointId = event.id,
+                suggestion = event.suggestion,
+                shouldClearSuggestions = event.shouldClearSuggestions
+            )
 
-                is HomeScreenUiEvents.AddPoint -> addPoint()
+            is HomeScreenUiEvents.AddPoint -> addPoint()
 
-                is HomeScreenUiEvents.ShowSnackBar -> sendSnackBarEvent(
-                    message = event.message
-                )
+            is HomeScreenUiEvents.ShowSnackBar -> sendSnackBarEvent(
+                message = event.message
+            )
 
-                is HomeScreenUiEvents.RemovePoint -> removePoint(
+            is HomeScreenUiEvents.RemovePoint -> removePoint(
+                pointId = event.id
+            )
+
+            is HomeScreenUiEvents.OptimizeRoute -> getDistanceMatrix(
+                locations = _mainActivityState
+                    .value
+                    .points
+                    .values
+                    .mapNotNull { it.selectedSuggestion?.name }
+            )
+
+            is HomeScreenUiEvents.FetchGeolocationData -> getFetchPlaceGeometry(
+                input = event.input,
+                pointId = event.id
+            )
+
+            is HomeScreenUiEvents.UpdatePointSearchText -> {
+                updatePointSearchText(
+                    input = event.text,
                     pointId = event.id
                 )
 
-                is HomeScreenUiEvents.OptimizeRoute -> getDistanceMatrix(
-                    locations = _mainActivityState
-                        .value
-                        .points
-                        .values
-                        .mapNotNull { it.selectedSuggestion?.name }
-                )
+            }
 
-                is HomeScreenUiEvents.FetchGeolocationData -> getFetchPlaceGeometry(
-                    input = event.input,
-                    pointId = event.id
-                )
+            is HomeScreenUiEvents.ClearPointName -> {
+                clearPointText(event.id)
+            }
 
-                is HomeScreenUiEvents.UpdatePointSearchText -> {
-                    updatePointSearchText(
-                        input = event.text,
-                        pointId = event.id
-                    )
-
-                }
+            is HomeScreenUiEvents.SendGoogleMapsCameraUpdate -> {
+                sendCameraAnimateEvent()
             }
         }
     }
 
+    /**
+     * Sends a one-shot event to update the camera on the Google Maps.
+     * @param cameraUpdate The camera update to be sent.
+     */
+    private fun sendCameraAnimateEvent() {
+        // Launch a coroutine in the viewModelScope
+        viewModelScope.launch {
+            val bounds = _mainActivityState.value
+                .tourLatLng
+                ?.calculateCameraViewPoints()
+                ?.getCenterLatLngs()
+
+            val cameraUpdate = CameraUpdateFactory.newLatLngBounds(
+                /* bounds = */ bounds ?: return@launch,
+                /* padding = */ 30
+            )
+
+            // Send a one-shot event containing the Google Maps camera update
+            _oneShotEvents.send(HomeScreenUiEvents.SendGoogleMapsCameraUpdate(cameraUpdate))
+        }
+    }
 
     /**
      * Retrieves the distance matrix for the provided locations and updates the UI.
@@ -112,10 +143,23 @@ class HomeScreenViewModel @Inject constructor(
                         // If there's an error, display an appropriate snackbar message
                         val message = networkResult.errorMessage ?: "Error"
                         sendSnackBarEvent(message)
+
+                        reduce {
+                            copy(
+                                isOptimizingRoute = false,
+                            )
+                        }
                     }
 
                     is NetworkResult.Loading -> {
                         // Indicate loading state in the UI
+                        reduce {
+                            copy(
+                                isOptimizingRoute = true,
+                                loadingMessage = "Holding on tight while we fetch the awesomeness."
+                            )
+
+                        }
 
                     }
 
@@ -124,7 +168,7 @@ class HomeScreenViewModel @Inject constructor(
                         reduce {
                             copy(
                                 distanceMatrix = networkResult.data,
-                                isGettingDistanceMatrix = false
+                                isOptimizingRoute = false
                             )
                         }
                         // Calculate and update the shortest path based on the new distance matrix
@@ -141,10 +185,20 @@ class HomeScreenViewModel @Inject constructor(
      * @param distanceMatrix The distance matrix used to calculate the shortest path.
      */
     private fun getShortestPath(distanceMatrix: DistanceMatrix?) = intent {
+
+        reduce {
+            copy(
+                isOptimizingRoute = true,
+                loadingMessage = "Navigating through the digital streets and " +
+                        "alleys to find the shortest path."
+            )
+        }
+
         // Check if the distance matrix is null
         if (distanceMatrix == null) {
             // Display a snackbar event indicating unavailability
             sendSnackBarEvent("No distance matrix available")
+            reduce { copy(isOptimizingRoute = false)}
             return@intent
         }
 
@@ -157,6 +211,12 @@ class HomeScreenViewModel @Inject constructor(
             adjacencyMatrixCreationType = AdjacencyMatrixCreationType.DISTANCE
         )
 
+        if (timeAdjacencyMatrix == null || distanceAdjacencyMatrix == null) {
+            // Display a snackbar event indicating unavailability
+            sendSnackBarEvent("Some point are not reachable, please check your input")
+            return@intent
+        }
+
         // Get the shortest path using the Held-Karp algorithm
         val tspResult = heldKarpgetShortestTimePath(
             timeAdjacencyMatrix = timeAdjacencyMatrix,
@@ -166,7 +226,8 @@ class HomeScreenViewModel @Inject constructor(
         // Update the main activity state with the new shortest path
         reduce {
             copy(
-                tspResult = tspResult
+                tspResult = tspResult,
+                isOptimizingRoute = false
             )
         }
 
@@ -222,7 +283,6 @@ class HomeScreenViewModel @Inject constructor(
 
                         reduce {
                             copy(
-                                isGettingDistanceMatrix = false
                             )
                         }
                     }
@@ -231,6 +291,12 @@ class HomeScreenViewModel @Inject constructor(
 
     }
 
+    /**
+     * Fetches geometry information for a given place input and updates the latitude and longitude of a point.
+     *
+     * @param input The input string representing the place.
+     * @param pointId The ID of the point to update.
+     */
     private fun getFetchPlaceGeometry(input: String, pointId: Int) = intent {
         placesRepository.fetchPlaceGeometry(input)
             .collect { networkResult ->
@@ -240,7 +306,9 @@ class HomeScreenViewModel @Inject constructor(
                         sendSnackBarEvent(message)
                     }
 
-                    is NetworkResult.Loading -> {}
+                    is NetworkResult.Loading -> {
+                        // Handle loading state if needed
+                    }
 
                     is NetworkResult.Success -> {
                         updatePointLatLng(
@@ -250,8 +318,8 @@ class HomeScreenViewModel @Inject constructor(
                     }
                 }
             }
-
     }
+
 
     private fun getPolyline() = intent {
         // Retrieve the TSP tour from the current state, or an empty list if not available
@@ -259,7 +327,7 @@ class HomeScreenViewModel @Inject constructor(
 
         // Extract the points corresponding to the tour indices from the current state
         val points = tspTour.mapNotNull {
-            _mainActivityState.value.points[it]
+            _mainActivityState.value.points.values.toList().getOrNull(it)
         }
 
         // Initiate a coroutine for asynchronous operations
@@ -272,23 +340,40 @@ class HomeScreenViewModel @Inject constructor(
                         // If there's an error, show a snack bar with the error message
                         val message = networkResult.errorMessage ?: "Error"
                         sendSnackBarEvent(message)
+
+                        reduce {
+                            copy(
+                                isOptimizingRoute = false
+                            )
+                        }
                     }
 
                     is NetworkResult.Loading -> {
                         // If the request is still loading, update the state to indicate so
+                        reduce {
+                            copy(
+                                isOptimizingRoute = true,
+                                loadingMessage = "Assembling the pieces of your epic journey. " +
+                                        "The best routes are worth the wait!"
+                            )
+                        }
                     }
 
                     is NetworkResult.Success -> {
                         // If the request is successful, update the state with the received polyline data
                         reduce {
+                            val tourLatLng = points.mapNotNull { it.latLng }
                             copy(
-                                decodedPolyLines = networkResult.data ?: emptyList()
+                                decodedPolyLines = networkResult.data ?: emptyList(),
+                                tourLatLng = tourLatLng,
+                                isOptimizingRoute = false
                             )
                         }
+                        // Send a one-shot event to update the Google Maps camera
+                        sendCameraAnimateEvent()
                     }
                 }
             }
-
     }
 
     /**
@@ -323,18 +408,28 @@ class HomeScreenViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Updates the latitude and longitude of a specific point.
+     * @param pointId The ID of the point to update.
+     * @param latLng The new latitude and longitude coordinates.
+     */
     private fun updatePointLatLng(
         pointId: Int,
         latLng: LatLng
     ) = intent {
+        // Retrieve the point with the given ID.
         val point = _mainActivityState.value.points[pointId]
+        // Check if the point exists.
         if (point == null) {
+            // If the point is not found, show a snack bar notification.
             sendSnackBarEvent("Point not found")
             return@intent
         }
+        // Update the point with the new latitude and longitude.
         val updatedPoint = point.copy(
             latLng = latLng
         )
+        // Reduce the state by updating the points list with the modified point.
         reduce {
             copy(
                 points = points + (pointId to updatedPoint)
@@ -373,7 +468,7 @@ class HomeScreenViewModel @Inject constructor(
      * @param suggestion The selected place.
      * @param shouldClearSuggestions Flag indicating whether to clear the place suggestions for the point.
      */
-    private fun selectPlace(
+    private fun selectSuggestion(
         pointId: Int,
         suggestion: Suggestion,
         shouldClearSuggestions: Boolean
@@ -390,6 +485,7 @@ class HomeScreenViewModel @Inject constructor(
 
         // Create an updated point with the selected place and updated suggestions list
         val updatedPoint = point.copy(
+            name = suggestion.name,
             selectedSuggestion = suggestion,
             suggestionSuggestions = if (shouldClearSuggestions) emptyList() else point.suggestionSuggestions
         )
@@ -411,7 +507,7 @@ class HomeScreenViewModel @Inject constructor(
      * @param input The new search text.
      * @param pointId The ID of the point to update.
      */
-    private fun updatePointSearchText(input: String, pointId: Int)  {
+    private fun updatePointSearchText(input: String, pointId: Int) {
         val point = _mainActivityState.value.points[pointId]
         if (point == null) {
             // If the point is not found, show a snack bar notification.
@@ -431,10 +527,42 @@ class HomeScreenViewModel @Inject constructor(
     }
 
     /**
+     * Clears the text and suggestions associated with a given point.
+     * If the point with the specified ID is not found, it sends a snackbar event.
+     * @param pointId The ID of the point to clear.
+     */
+    private fun clearPointText(pointId: Int) = intent {
+        // Retrieve the point with the specified ID from the current state
+        val point = _mainActivityState.value.points[pointId]
+
+        // Check if the point is null (not found)
+        if (point == null) {
+            // Send a snackbar event indicating that the point was not found
+            sendSnackBarEvent("Point not found")
+            // Exit the function early
+            return@intent
+        }
+
+        // Create an updated copy of the point with cleared text and suggestions
+        val updatedPoint = point.copy(
+            name = "", // Clear the name
+            suggestionSuggestions = emptyList(), // Clear the suggestions
+        )
+
+        // Update the main activity state by replacing the old point with the updated one
+        _mainActivityState.update {
+            it.copy(
+                points = it.points + (pointId to updatedPoint)
+            )
+        }
+    }
+
+
+    /**
      * Removes a point from the main activity state.
      * @param pointId The ID of the point to be removed.
      */
-    fun removePoint(pointId: Int) = intent {
+    private fun removePoint(pointId: Int) = intent {
         // Check if the point to be removed is the start point (ID 0)
         if (pointId == 0) {
             // If the point to be removed is the start point, display a snackbar message and return
@@ -475,7 +603,9 @@ class HomeScreenViewModel @Inject constructor(
      */
     private suspend fun reduce(reducer: HomeScreenState.() -> HomeScreenState) {
         withContext(SINGLE_THREAD) {
-            _mainActivityState.value = _mainActivityState.value.reducer()
+            _mainActivityState.update {
+                it.reducer()
+            }
         }
     }
 

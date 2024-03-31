@@ -4,18 +4,21 @@ import com.google.maps.model.DistanceMatrix
 
 fun DistanceMatrix.getAdjacencyMatrix(
     adjacencyMatrixCreationType: AdjacencyMatrixCreationType = AdjacencyMatrixCreationType.DISTANCE
-): Array<LongArray> {
-    return Array(rows.size) { i ->
-        LongArray(rows.size) { j ->
-            val value = when (adjacencyMatrixCreationType) {
-                AdjacencyMatrixCreationType.DISTANCE -> rows[i].elements[j].distance.inMeters
-                AdjacencyMatrixCreationType.DURATION -> rows[i].elements[j].duration.inSeconds
+): Array<LongArray>? {
+    return try {
+        Array(rows.size) { i ->
+            LongArray(rows.size) { j ->
+                val value = when (adjacencyMatrixCreationType) {
+                    AdjacencyMatrixCreationType.DISTANCE -> rows[i].elements[j].distance.inMeters
+                    AdjacencyMatrixCreationType.DURATION -> rows[i].elements[j].duration.inSeconds
+                }
+                value
             }
-            value
         }
+    } catch (throwable: Throwable) {
+        null
     }
 }
-
 fun heldKarpgetShortestTimePath(
     timeAdjacencyMatrix: Array<LongArray>,
     distanceAdjacencyMatrix: Array<LongArray>

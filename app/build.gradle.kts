@@ -74,10 +74,14 @@ dependencies {
     //LoggingInterceptor
     implementation (libs.logging.interceptor)
 
+    // coil
+    implementation(libs.coil.compose)
+
 
     // hilt
     api(libs.hilt.android)
     implementation(libs.androidx.appcompat)
+    debugImplementation(libs.compose.ui.tooling)
     kapt(libs.hilt.android.compiler)
     api(libs.androidx.hilt.navigation.compose)
 

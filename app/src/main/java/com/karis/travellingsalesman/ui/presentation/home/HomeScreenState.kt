@@ -7,12 +7,18 @@ import com.karis.travellingsalesman.utils.TSPResult
 
 data class HomeScreenState(
     val distanceMatrix: DistanceMatrix? = null,
-    val isGettingDistanceMatrix: Boolean = false,
     val tspResult: TSPResult? = null,
     val points: Map<Int, Point> = mapOf(0 to Point(0, "")),
-    val decodedPolyLines: List<LatLng> = emptyList()
-)
+//    val points: LinkedHashMap<Int, Point> = linkedMapOf(0 to Point(0, "")),
+    val decodedPolyLines: List<LatLng> = emptyList(),
+    val tourLatLng: List<LatLng>? = null,
+    val isOptimizingRoute: Boolean = false,
+    val loadingMessage: String = "",
+) {
+    fun isButtonEnabled(): Boolean {
+        return points.size > 1 && points.values.all { it.selectedSuggestion != null }
+    }
 
-fun HomeScreenState.isButtonEnabled(): Boolean {
-    return points.size > 1 && points.values.all { it.selectedSuggestion != null }
 }
+
+

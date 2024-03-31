@@ -1,5 +1,6 @@
 package com.karis.travellingsalesman.ui.presentation.home
 
+import com.google.android.gms.maps.CameraUpdate
 import com.karis.travellingsalesman.domain.models.Suggestion
 
 sealed interface HomeScreenUiEvents {
@@ -17,4 +18,9 @@ sealed interface HomeScreenUiEvents {
     data class FetchGeolocationData(val id: Int, val input: String) : HomeScreenUiEvents
 
     data class UpdatePointSearchText(val id: Int, val text: String) : HomeScreenUiEvents
+
+    data class ClearPointName(val id: Int) : HomeScreenUiEvents
+
+    data class SendGoogleMapsCameraUpdate(val cameraUpdate: CameraUpdate): HomeScreenUiEvents
+
 }

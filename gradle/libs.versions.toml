@@ -1,5 +1,6 @@
 [versions]
 androidx-material3 = "1.2.1"
+coilCompose = "2.6.0"
 kotlin = "1.8.10"
 gradle = "8.1.2"
 activity-compose = "1.8.0"
@@ -26,6 +27,7 @@ accompanist-systemuicontroller = "0.27.0"
 
 [libraries]
 androidx-material3-v120alpha02 = { module = "androidx.compose.material3:material3", version.ref = "androidx-material3" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 compose-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "compose" }
 compose-ui-ui = { module = "androidx.compose.ui:ui", version.ref = "compose" }
 compose-ui-util = { module = "androidx.compose.ui:ui-util", version.ref = "compose" }

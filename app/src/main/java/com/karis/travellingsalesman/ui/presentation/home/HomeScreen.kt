@@ -11,24 +11,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
@@ -38,21 +38,26 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
 import com.karis.travellingsalesman.domain.models.Point
 import com.karis.travellingsalesman.utils.convertSecondsToTime
 import com.karis.travellingsalesman.utils.observeAsEvents
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,13 +65,26 @@ fun HomeScreen(
     homeScreenViewModel: HomeScreenViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val nairobi = LatLng(-1.286389, 36.817223)
+    val scope = rememberCoroutineScope()
 
     val homeScreenState = homeScreenViewModel.mainActivityState.collectAsState()
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(nairobi, 10f)
+    }
 
-    observeAsEvents(flow = homeScreenViewModel.oneShotEvents) {
-        when (it) {
+    observeAsEvents(flow = homeScreenViewModel.oneShotEvents) { homeScreenUiEvent ->
+        when (homeScreenUiEvent) {
             is HomeScreenUiEvents.ShowSnackBar -> {
-                Toast.makeText(context, it.message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, homeScreenUiEvent.message, Toast.LENGTH_SHORT).show()
+            }
+
+            is HomeScreenUiEvents.SendGoogleMapsCameraUpdate -> {
+                scope.launch {
+                    cameraPositionState.animate(
+                        update = homeScreenUiEvent.cameraUpdate
+                    )
+                }
             }
 
             else -> {}
@@ -77,7 +95,8 @@ fun HomeScreen(
         bottomSheetState = SheetState(
             initialValue = SheetValue.Expanded,
             skipPartiallyExpanded = false,
-            density = LocalDensity.current
+            density = LocalDensity.current,
+            skipHiddenState = true
         )
     )
 
@@ -98,22 +117,30 @@ fun HomeScreen(
                 .padding(bottom = 12.dp)
                 .fillMaxSize(),
         ) {
-            val nairobi = LatLng(-1.286389, 36.817223)
-            val cameraPositionState = rememberCameraPositionState {
-                position = CameraPosition.fromLatLngZoom(nairobi, 12f)
-            }
+
             GoogleMap(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(),
                 cameraPositionState = cameraPositionState
             ) {
-                homeScreenState.value.decodedPolyLines.let {
-                    Polyline(
-                        points = it,
-                        color = Color.Green
+
+                homeScreenState.value.tourLatLng?.forEachIndexed { index, latLng ->
+                    Marker(
+                        icon = BitmapDescriptorFactory.defaultMarker(),
+                        state = rememberMarkerState(position = latLng),
+                        title = if (index == 0) "Start Point" else "Point $index ",
                     )
                 }
+
+                Polyline(
+                    points = homeScreenState.value.decodedPolyLines,
+                    clickable = true,
+                    geodesic = true,
+                    jointType = JointType.BEVEL,
+                    zIndex = 1f,
+                )
+
             }
         }
     }
@@ -162,6 +189,17 @@ private fun RouteOptimization(
             )
         }
 
+        if (homeScreenState.value.isOptimizingRoute) {
+            item {
+                LinearProgressIndicator()
+            }
+            item {
+                Text(
+                    text = homeScreenState.value.loadingMessage,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
 
         val items = homeScreenState.value.points.values.toList()
         items(items.size) { index ->
@@ -173,7 +211,6 @@ private fun RouteOptimization(
                 index = index
             )
         }
-
 
         item {
             Row(
@@ -252,37 +289,46 @@ fun DestinationPoint(
                     )
                 }
             )
+            val pointSearchTextEmpty = homeScreenState
+                .value
+                .points[point.id]
+                ?.name
+                .orEmpty()
+                .isEmpty()
+
             Icon(
                 modifier = Modifier
                     .padding(horizontal = 4.dp)
                     .clickable {
-                        onEvent(HomeScreenUiEvents.RemovePoint(point.id))
+                        if (!pointSearchTextEmpty) {
+                            onEvent(HomeScreenUiEvents.ClearPointName(point.id))
+                        } else {
+                            onEvent(HomeScreenUiEvents.RemovePoint(point.id))
+                        }
                     },
-                imageVector = Icons.Default.Close,
-                contentDescription = ""
+                imageVector = if (!pointSearchTextEmpty) Icons.Default.Clear else Icons.Default.Delete,
+                contentDescription = "",
+                tint = if (!pointSearchTextEmpty) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.error
+                }
             )
-
         }
 
-        if (point.suggestionSuggestions.isNotEmpty()) {
-            LazyColumn(
+        point.suggestionSuggestions.forEach { place ->
+            Text(
+                text = "${place.name} ",
                 modifier = Modifier
-                    .height(140.dp)
-            ) {
-                items(point.suggestionSuggestions) { place ->
-                    Text(
-                        text = "${place.name} ",
-                        modifier = Modifier
-                            .padding(vertical = 4.dp)
-                            .clickable {
-                                onEvent(HomeScreenUiEvents.SelectPlace(point.id, place, true))
-                            },
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
+                    .padding(vertical = 4.dp)
+                    .clickable {
+                        onEvent(HomeScreenUiEvents.SelectPlace(point.id, place, true))
+                    },
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
+
 }
 
 @Composable
@@ -331,4 +377,3 @@ fun RouteOptimizationResults(
         }
     }
 }
-
