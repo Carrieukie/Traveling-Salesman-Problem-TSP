@@ -102,6 +102,24 @@ class HomeScreenViewModel @Inject constructor(
             is HomeScreenUiEvents.SendGoogleMapsCameraUpdate -> {
                 sendCameraAnimateEvent()
             }
+
+            is HomeScreenUiEvents.SetBottomSheetIndex -> {
+                setBottomSheetIndex(event.index)
+            }
+        }
+    }
+
+    /**
+     * Sets the bottom sheet index in the state.
+     * @param event The event containing the index to be set.
+     */
+    private fun setBottomSheetIndex(
+        index: Int
+    ) = intent{
+        reduce {
+            copy(
+                currentBottomsheetIndex = index
+            )
         }
     }
 
@@ -114,6 +132,7 @@ class HomeScreenViewModel @Inject constructor(
         viewModelScope.launch {
             val bounds = _mainActivityState.value
                 .tourLatLng
+                ?.mapNotNull { it.latLng }
                 ?.calculateCameraViewPoints()
                 ?.getCenterLatLngs()
 
@@ -168,7 +187,8 @@ class HomeScreenViewModel @Inject constructor(
                         reduce {
                             copy(
                                 distanceMatrix = networkResult.data,
-                                isOptimizingRoute = false
+                                isOptimizingRoute = false,
+                                currentBottomsheetIndex = 1
                             )
                         }
                         // Calculate and update the shortest path based on the new distance matrix
@@ -328,7 +348,7 @@ class HomeScreenViewModel @Inject constructor(
         // Extract the points corresponding to the tour indices from the current state
         val points = tspTour.mapNotNull {
             _mainActivityState.value.points.values.toList().getOrNull(it)
-        }
+        }.toMutableList()
 
         // Initiate a coroutine for asynchronous operations
         // Fetch the polyline data from the repository based on the points
@@ -362,10 +382,9 @@ class HomeScreenViewModel @Inject constructor(
                     is NetworkResult.Success -> {
                         // If the request is successful, update the state with the received polyline data
                         reduce {
-                            val tourLatLng = points.mapNotNull { it.latLng }
                             copy(
                                 decodedPolyLines = networkResult.data ?: emptyList(),
-                                tourLatLng = tourLatLng,
+                                tourLatLng = points,
                                 isOptimizingRoute = false
                             )
                         }

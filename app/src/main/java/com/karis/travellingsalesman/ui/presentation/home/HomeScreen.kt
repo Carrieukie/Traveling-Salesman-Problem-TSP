@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
@@ -38,9 +36,11 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -49,11 +49,15 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
+import com.karis.travellingsalesman.R
 import com.karis.travellingsalesman.domain.models.Point
 import com.karis.travellingsalesman.utils.convertSecondsToTime
 import com.karis.travellingsalesman.utils.observeAsEvents
@@ -93,10 +97,9 @@ fun HomeScreen(
 
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = SheetState(
+            density = LocalDensity.current,
             initialValue = SheetValue.Expanded,
             skipPartiallyExpanded = false,
-            density = LocalDensity.current,
-            skipHiddenState = true
         )
     )
 
@@ -117,20 +120,42 @@ fun HomeScreen(
                 .padding(bottom = 12.dp)
                 .fillMaxSize(),
         ) {
+            val nightModeMap = MapStyleOptions.loadRawResourceStyle(
+                context,
+                R.raw.map_style_night
+            )
+            val mapProperties = MapProperties(
+                isMyLocationEnabled = false,
+                mapStyleOptions = nightModeMap,
+            )
+
+            val uiSettings = remember {
+                MapUiSettings(
+                    myLocationButtonEnabled = false,
+                    zoomControlsEnabled = false,
+                    mapToolbarEnabled = false
+                )
+            }
 
             GoogleMap(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(),
-                cameraPositionState = cameraPositionState
+                cameraPositionState = cameraPositionState,
+                properties = mapProperties,
+                uiSettings = uiSettings
             ) {
-
-                homeScreenState.value.tourLatLng?.forEachIndexed { index, latLng ->
-                    Marker(
-                        icon = BitmapDescriptorFactory.defaultMarker(),
-                        state = rememberMarkerState(position = latLng),
-                        title = if (index == 0) "Start Point" else "Point $index ",
-                    )
+                val tour = homeScreenState.value.tourLatLng ?: mutableListOf()
+                for (i in tour.indices) {
+                    val point = homeScreenState.value.points[i]
+                    point?.latLng?.let { latLng ->
+                        Marker(
+                            icon = BitmapDescriptorFactory.defaultMarker(),
+                            state = rememberMarkerState(position = latLng),
+                            snippet = homeScreenState.value.points[i]?.selectedSuggestion?.name.orEmpty(),
+                            title = if (i == 0) "Start Point" else "Point $i"
+                        )
+                    }
                 }
 
                 Polyline(
@@ -139,6 +164,8 @@ fun HomeScreen(
                     geodesic = true,
                     jointType = JointType.BEVEL,
                     zIndex = 1f,
+                    color = MaterialTheme.colorScheme.primary,
+                    width = 10f
                 )
 
             }
@@ -146,25 +173,19 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BottomSheet(
     homeScreenState: State<HomeScreenState>,
     onEvent: (HomeScreenUiEvents) -> Unit,
 ) {
-    val pagerState = rememberPagerState(pageCount = {
-        2
-    })
-    HorizontalPager(
+    Column(
         modifier = Modifier
+            .fillMaxWidth()
             .animateContentSize()
-            .wrapContentHeight(),
-        state = pagerState,
-        verticalAlignment = Alignment.Top,
-    ) { page ->
-        when (page) {
+    ) {
+        when (homeScreenState.value.currentBottomsheetIndex) {
             0 -> RouteOptimization(homeScreenState, onEvent)
-            1 -> RouteOptimizationResults(homeScreenState)
+            1 -> RouteOptimizationResults(homeScreenState, onEvent)
         }
     }
 }
@@ -178,6 +199,7 @@ private fun RouteOptimization(
         modifier = Modifier
             .animateContentSize()
             .fillMaxWidth()
+            .wrapContentHeight()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
             .imePadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -191,7 +213,10 @@ private fun RouteOptimization(
 
         if (homeScreenState.value.isOptimizingRoute) {
             item {
-                LinearProgressIndicator()
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                )
             }
             item {
                 Text(
@@ -235,16 +260,19 @@ private fun RouteOptimization(
             HorizontalDivider()
         }
 
-
         item {
             Button(
                 modifier = Modifier
                     .fillMaxWidth(),
                 enabled = homeScreenState.value.isButtonEnabled(),
+                shape = MaterialTheme.shapes.large,
                 onClick = {
                     onEvent(HomeScreenUiEvents.OptimizeRoute)
                 }) {
-                Text(text = "Optimize")
+                Text(
+                    text = "Optimize",
+                    style = MaterialTheme.typography.titleSmall
+                )
             }
         }
     }
@@ -333,14 +361,15 @@ fun DestinationPoint(
 
 @Composable
 fun RouteOptimizationResults(
-    homeScreenState: State<HomeScreenState>
+    homeScreenState: State<HomeScreenState>,
+    onEvent: (HomeScreenUiEvents) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
             .animateContentSize()
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
-            .imePadding(),
+            .wrapContentHeight(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -348,6 +377,21 @@ fun RouteOptimizationResults(
                 text = "Route Optimization",
                 style = MaterialTheme.typography.titleMedium
             )
+        }
+
+        if (homeScreenState.value.isOptimizingRoute) {
+            item {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                )
+            }
+            item {
+                Text(
+                    text = homeScreenState.value.loadingMessage,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
 
         item {
@@ -371,9 +415,25 @@ fun RouteOptimizationResults(
 
         item {
             Text(
-                text = "Fastest route now due to traffic conditions.",
+                text = "Fastest(time based) route now due to traffic conditions.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+
+        item {
+            Button(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                enabled = homeScreenState.value.isButtonEnabled(),
+                shape = MaterialTheme.shapes.large,
+                onClick = {
+                    onEvent(HomeScreenUiEvents.SetBottomSheetIndex(0))
+                }) {
+                Text(
+                    text = "Modify Points",
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
         }
     }
 }

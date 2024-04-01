@@ -23,4 +23,5 @@ sealed interface HomeScreenUiEvents {
 
     data class SendGoogleMapsCameraUpdate(val cameraUpdate: CameraUpdate): HomeScreenUiEvents
 
+    data class SetBottomSheetIndex(val index: Int): HomeScreenUiEvents
 }

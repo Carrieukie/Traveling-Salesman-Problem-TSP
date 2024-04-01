@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.toArgb
@@ -25,9 +26,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             drawContentBehindSystemBars()
-            ChangeSystemBarsTheme(lightTheme = !isSystemInDarkTheme())
+//            ChangeSystemBarsTheme(lightTheme = !isSystemInDarkTheme())
             TravellingSalesManTheme{
-                HomeScreen()
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    HomeScreen()
+                }
             }
         }
     }
