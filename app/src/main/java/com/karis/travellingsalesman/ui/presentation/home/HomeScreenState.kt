@@ -11,7 +11,7 @@ data class HomeScreenState(
     val points: Map<Int, Point> = mapOf(0 to Point(0, "")),
 //    val points: LinkedHashMap<Int, Point> = linkedMapOf(0 to Point(0, "")),
     val decodedPolyLines: List<LatLng> = emptyList(),
-    val tourLatLng: List<Point>? = null,
+    val pointsTour: List<Point>? = null,
     val isOptimizingRoute: Boolean = false,
     val loadingMessage: String = "",
     val currentBottomsheetIndex: Int = 0

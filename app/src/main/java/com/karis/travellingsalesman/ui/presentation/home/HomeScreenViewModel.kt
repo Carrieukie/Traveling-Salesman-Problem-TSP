@@ -2,7 +2,6 @@ package com.karis.travellingsalesman.ui.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.CameraUpdate
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.model.DistanceMatrix
@@ -131,7 +130,7 @@ class HomeScreenViewModel @Inject constructor(
         // Launch a coroutine in the viewModelScope
         viewModelScope.launch {
             val bounds = _mainActivityState.value
-                .tourLatLng
+                .pointsTour
                 ?.mapNotNull { it.latLng }
                 ?.calculateCameraViewPoints()
                 ?.getCenterLatLngs()
@@ -384,7 +383,7 @@ class HomeScreenViewModel @Inject constructor(
                         reduce {
                             copy(
                                 decodedPolyLines = networkResult.data ?: emptyList(),
-                                tourLatLng = points,
+                                pointsTour = points,
                                 isOptimizingRoute = false
                             )
                         }
