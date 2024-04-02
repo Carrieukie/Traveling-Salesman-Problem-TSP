@@ -291,18 +291,16 @@ fun RouteOptimizationResults(
                 ),
                 color = MaterialTheme.colorScheme.primary,
             )
-
-            homeScreenState.value.pointsTour?.let { tour ->
-                for (i in tour.indices) {
-                    val point = homeScreenState.value.pointsTour?.get(i)
-                    point?.let {
-                        Text(
-                            text = "${i + 1}. ${point.name}",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            )
+            val tour = homeScreenState.value.pointsTour ?: mutableListOf()
+            for (i in tour.indices) {
+                val point = homeScreenState.value.pointsTour?.get(i)
+                point?.let {
+                    Text(
+                        text = "${i + 1}. ${point.name}",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Bold
                         )
-                    }
+                    )
                 }
             }
         }

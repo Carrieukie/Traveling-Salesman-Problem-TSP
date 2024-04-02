@@ -127,7 +127,7 @@ fun HomeScreen(
                         Marker(
                             icon = BitmapDescriptorFactory.defaultMarker(),
                             state = rememberMarkerState(position = latLng),
-                            snippet = homeScreenState.value.points[i]?.selectedSuggestion?.name.orEmpty(),
+                            snippet = point.name,
                             title = if (i == 0) "Start Point" else "Point $i"
                         )
                     }
@@ -147,3 +147,4 @@ fun HomeScreen(
         }
     }
 }
+
