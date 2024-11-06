@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             drawContentBehindSystemBars()
-//            ChangeSystemBarsTheme(lightTheme = !isSystemInDarkTheme())
+            ChangeSystemBarsTheme(lightTheme = !isSystemInDarkTheme())
             TravellingSalesManTheme{
                 Surface(color = MaterialTheme.colorScheme.background) {
                     HomeScreen()

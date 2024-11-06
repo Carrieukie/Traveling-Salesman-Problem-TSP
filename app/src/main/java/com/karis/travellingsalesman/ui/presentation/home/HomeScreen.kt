@@ -139,7 +139,7 @@ fun HomeScreen(
                     geodesic = true,
                     jointType = JointType.BEVEL,
                     zIndex = 1f,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.surface,
                     width = 10f
                 )
 

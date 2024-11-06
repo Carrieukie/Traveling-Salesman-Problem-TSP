@@ -19,6 +19,11 @@ The main idea behind the Held-Karp algorithm is to break down the TSP into small
 
 You can checkout its implementation in this project [here](https://github.com/Carrieukie/TravellingSalesMan/blob/main/app/src/main/java/com/karis/travellingsalesman/utils/OptimizationUtils.kt)
 
+## Screenshots
+<img src="assests/screenshot1.png" width="300" alt="Screenshot 1">
+<img src="assests/screenshot2.png" width="300" alt="Screenshot 2">
+<img src="assests/screenshot3.png" width="300" alt="Screenshot 3">
+
 
 ## Features
 - Solve TSP instances with a given set of cities and their distances.

@@ -82,7 +82,7 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun TravellingSalesManTheme(
-    theme: Int = Theme.DARK_THEME.themeValue,
+    theme: Int = Theme.LIGHT_THEME.themeValue,
     content: @Composable () -> Unit
 ) {
     val autoColors = if (isSystemInDarkTheme()) DarkColors else LightColors
