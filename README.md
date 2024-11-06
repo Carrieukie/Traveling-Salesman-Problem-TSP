@@ -2,6 +2,12 @@
 
 [Watch the video on Vimeo](https://vimeo.com/933548614)
 
+## Screenshots
+<div style="display: flex; gap: 10px;">
+    <img src="assests/screenshot1.png" width="300" alt="Screenshot 1">
+    <img src="assests/screenshot2.png" width="300" alt="Screenshot 2">
+    <img src="assests/screenshot3.png" width="300" alt="Screenshot 3">
+</div>
 
 ## Introduction
 This Android project is a solution to the Traveling Salesman Problem (TSP) using the Held-Karp algorithm. The Traveling Salesman Problem is a classic problem in the field of computer science and optimization, where the goal is to find the shortest possible route that visits each city exactly once and returns to the original city.
@@ -21,12 +27,6 @@ The main idea behind the Held-Karp algorithm is to break down the TSP into small
  5. Complexity Analysis: The time complexity of the Held-Karp algorithm is O(n^2 * 2^n), where 'n' is the number of cities. This complexity arises due to the number of subsets of cities to be considered and the time taken to compute the optimal cost for each subset.
 
 You can checkout its implementation in this project [here](https://github.com/Carrieukie/TravellingSalesMan/blob/main/app/src/main/java/com/karis/travellingsalesman/utils/OptimizationUtils.kt)
-
-## Screenshots
-<img src="assests/screenshot1.png" width="300" alt="Screenshot 1">
-<img src="assests/screenshot2.png" width="300" alt="Screenshot 2">
-<img src="assests/screenshot3.png" width="300" alt="Screenshot 3">
-
 
 ## Features
 - Solve TSP instances with a given set of cities and their distances.
